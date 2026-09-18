@@ -28,6 +28,8 @@ perf/results/*
 !perf/results/summary-load-50us.json
 !perf/results/summary-load-pool.json
 !perf/results/summary-stress-pool.json
+!perf/results/summary-voters-ci.json
+!perf/results/observability-ci.md
 
 # Laboratorio de mediciones (perf/lab): se versionan scripts y data/, no lo crudo.
 perf/lab/results/

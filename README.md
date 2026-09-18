@@ -242,6 +242,7 @@ Variables de entorno soportadas:
 - `DATA_FILE` (por defecto `perf/data/persons.csv`)
 - `SCENARIO`: `ci` | `baseline` | `load` | `stress` | `spike` | `soak` | `regression` (por defecto `baseline`)
 - `TIMEOUT_MS`: timeout del cliente HTTP (por defecto `2000`)
+- `ID_BASE`: desplazamiento del rango de IDs para ejecutar escenarios consecutivos contra la misma H2 sin falsos `DUPLICATED` (por defecto `0`)
 
 > Si ya tienes el archivo desde el taller, úsalo tal cual. Si no, crea uno con el contenido proporcionado anteriormente.
 
@@ -383,14 +384,11 @@ Documente un breve análisis con los números obtenidos.
   - **Gates** de calidad: fallar el *pipeline* si p95 > SLO o la tasa de error > 1%.
   - Separar los escenarios cortos (en cada PR) de los largos (nocturnos).
 
-El repositorio trae el flujo listo en [`perf/ci/github-actions.yml`](perf/ci/github-actions.yml).
-
-> **GitHub Actions solo lee los workflows de `.github/workflows/`.** El archivo está en `perf/ci/` para que quede versionado junto al resto del material de rendimiento, pero **no se ejecuta desde ahí**. Cópielo:
->
-> ```bash
-> mkdir -p .github/workflows
-> cp perf/ci/github-actions.yml .github/workflows/perf.yml
-> ```
+El material de referencia está en [`perf/ci/github-actions.yml`](perf/ci/github-actions.yml).
+El flujo que GitHub ejecuta para esta entrega ya está configurado en
+[`.github/workflows/perf.yml`](.github/workflows/perf.yml). No copie la
+plantilla sobre ese archivo: la versión activa incorpora los rangos de IDs y
+los escenarios exigidos para cada Pull Request.
 
 Tres decisiones de ese flujo que conviene entender:
 
@@ -411,7 +409,7 @@ Tres decisiones de ese flujo que conviene entender:
 
 Un `sleep 30` fijo en lugar de ese bucle es una fuente clásica de pruebas inestables: a veces alcanza, a veces no.
 
-**2. En un pull request solo corre el escenario corto `ci`.** Usa 20 VUs por 60 segundos y conserva los mismos *thresholds*. El escenario `load` dura casi 15 minutos y bloquearía la revisión; los escenarios largos van en `workflow_dispatch` o en una ejecución nocturna.
+**2. Cada pull request ejecuta baseline y load.** El workflow usa rangos de IDs distintos en cada paso para que el estado de H2 no produzca falsos duplicados. Los escenarios de estrés, spike y soak quedan disponibles mediante `workflow_dispatch`, pues su duración no corresponde a cada revisión.
 
 **3. El gate no necesita lógica adicional.** Los `thresholds` del script ya son el criterio: si el p95 supera el SLO o la tasa de error pasa del 1%, k6 termina con código distinto de cero y el paso falla solo.
 
@@ -431,6 +429,8 @@ El servicio ya expone métricas (ver `application.properties`):
 management.endpoints.web.exposure.include=health,metrics,prometheus
 management.metrics.distribution.percentiles-histogram.http.server.requests=true
 management.metrics.distribution.percentiles.http.server.requests=0.5,0.95,0.99
+management.metrics.distribution.minimum-expected-value.http.server.requests=1us
+management.metrics.distribution.maximum-expected-value.http.server.requests=1s
 ```
 
 Con el servicio arriba:
@@ -479,6 +479,16 @@ Con 200 VUs eso significa cientos de conexiones creadas y destruidas por segundo
 2. Consulte `jvm.threads.live` durante la corrida. ¿Cuántos hilos hay activos en el pico?
 3. Agregue un pool de conexiones (HikariCP viene con Spring Boot) y repita la medición. Documente en el Wiki el antes y el después.
 4. Explique por qué este defecto no aparece en ninguno de los otros tres talleres.
+
+#### Evidencia actual
+
+En una corrida aislada de 60 segundos con 20 VUs y las seis clases de negocio,
+k6 registró p95 = 1.383 ms, mientras que Actuator registró p95 = 0.425 ms para
+`POST /register`. La diferencia aproximada de 0.958 ms corresponde al
+recorrido HTTP y al tiempo antes de que el servidor procese la solicitud. La
+misma corrida tuvo 11,839 solicitudes, 0 % de fallos HTTP y 0 % de resultados
+de negocio incorrectos. La evidencia completa está en
+[`perf/results/observability-ci.md`](perf/results/observability-ci.md).
 
 > **La conclusión que buscamos**: una prueba de carga sin observabilidad le dice que algo va mal; con observabilidad le dice **qué** arreglar. La primera genera reuniones; la segunda, cambios de código.
 

@@ -14,6 +14,9 @@ const DATA_FILE  = __ENV.DATA_FILE || null; // si no viene, el script intentará
 const SCENARIO   = (__ENV.SCENARIO || 'baseline').toLowerCase();
 const TIMEOUT_MS = Number(__ENV.TIMEOUT_MS || 2000);
 const SLEEP_MS   = Number(__ENV.SLEEP_MS || 0); // micro-pausa opcional entre iteraciones
+// Permite ejecutar escenarios consecutivos contra el mismo servicio (como en
+// CI) sin reutilizar los ids ya creados por una corrida anterior.
+const ID_BASE    = Number(__ENV.ID_BASE || 0);
 
 /**
  * =========================
@@ -165,7 +168,7 @@ function buildUniqueId(baseId) {
   // dos baseId distintos se solapan y vuelven a colisionar.
   // Cota: con 600 VUs el maximo es 601_000_000, holgadamente dentro del int
   // de Java (2_147_483_647) que espera PersonDTO.id.
-  return (__VU * 1000000) + (__ITER % 1000000);
+  return ID_BASE + (__VU * 1000000) + (__ITER % 1000000);
 }
 
 function nextPayload() {

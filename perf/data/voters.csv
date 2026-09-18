@@ -1,6 +1,6 @@
 id,name,age,gender,alive,expected
-1001,Ana Martinez,28,FEMALE,false,DEAD
-1002,Laura Castro,1,FEMALE,true,UNDERAGE
+0,Registro Invalido,30,FEMALE,true,INVALID
+1002,Registro Duplicado,30,FEMALE,true,DUPLICATED
 1003,Ana Gonzalez,21,MALE,false,DEAD
 1004,Mateo Rodriguez,54,MALE,false,DEAD
 1005,Sofia Torres,42,MALE,true,VALID

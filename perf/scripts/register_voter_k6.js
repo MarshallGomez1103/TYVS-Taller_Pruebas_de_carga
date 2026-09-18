@@ -196,7 +196,11 @@ export default function () {
   // No se puede resolver metiendo la marca de tiempo en el id: el campo es un
   // int de Java y con 600 VUs ya se consume la tercera parte del rango. El
   // estado de prueba se gestiona reiniciando, no ensanchando el identificador.
-  const uniqueId = ID_BASE + (__VU * 1000000) + (__ITER % 1000000);
+  // INVALID debe conservar su id no positivo para que el servicio alcance
+  // esa regla. Las demás clases usan ids únicos por corrida.
+  const uniqueId = v.expected === 'INVALID'
+    ? v.id
+    : ID_BASE + (__VU * 1000000) + (__ITER % 1000000);
 
   const payload = JSON.stringify({
     name: v.name,
@@ -212,6 +216,16 @@ export default function () {
     tags: { endpoint: '/register', scenario: SCENARIO },
   };
 
+  // DUPLICATED exige una precondición: el mismo id debe existir. Se crea con
+  // una solicitud previa y se valida el duplicado en la solicitud medida.
+  // Así el CSV cubre las seis clases sin depender de estado heredado de otra
+  // corrida ni convertir un falso DUPLICATED en un resultado correcto.
+  let preconditionOk = true;
+  if (v.expected === 'DUPLICATED') {
+    const seed = http.post(BASE_URL + '/register', payload, params);
+    preconditionOk = seed.status === 200 && String(seed.body || '').trim().toUpperCase() === 'VALID';
+  }
+
   const res = http.post(BASE_URL + '/register', payload, params);
 
   registerDuration.add(res.timings.duration, params.tags);
@@ -224,7 +238,7 @@ export default function () {
   // Un 200 con el cuerpo equivocado sigue siendo un fallo.
   const ok = check(res, {
     'status 200': function (r) { return r.status === 200; },
-    'resultado de negocio esperado': function () { return outcome === v.expected; },
+    'resultado de negocio esperado': function () { return preconditionOk && outcome === v.expected; },
   });
 
   registerFailed.add(!ok);

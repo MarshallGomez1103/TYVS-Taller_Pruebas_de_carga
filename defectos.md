@@ -54,29 +54,32 @@ introducir fallos HTTP ni de negocio.
 
 ---
 
-## OBS-01 — Percentiles de Actuator no utilizables para comparar p95 del servidor
+## OBS-01 — Resolución insuficiente de los percentiles de Actuator
 
 | Campo | Registro |
 |---|---|
-| Estado | Abierto — mejora de observabilidad pendiente |
+| Estado | **Resuelto y verificado** |
 | Prioridad | Media |
 | Capa afectada | Métricas Micrometer / Prometheus |
 | Escenario observado | `load` antes del pool |
 | Resultado esperado | Obtener un p95 del servidor con resolución útil para compararlo con el p95 de k6. |
-| Resultado obtenido | En una corrida `load` sin pool, Actuator registró 23,264,332 solicitudes y un máximo de 81.77 ms; sin embargo, la exportación Prometheus mostró p50, p95 y p99 como `0.0` s y solo el bucket `+Inf`. |
+| Resultado antes | En una corrida `load` sin pool, Prometheus mostró p50, p95 y p99 como `0.0` s y solo el bucket `+Inf`. |
+| Resultado después | Con histogramas desde 1 µs, una corrida `ci` registró p95 de Actuator = 0.425 ms y p95 de k6 = 1.383 ms. |
 
 ### Impacto
 
-La latencia de k6 sí es válida como medición del cliente, pero no se debe
-afirmar que el p95 del servidor fue literalmente 0 ms. Con esta resolución no
-es posible cuantificar de forma confiable la diferencia cliente-servidor ni
-atribuirla exactamente a cola, red o procesamiento.
+La latencia de k6 mide la experiencia completa del cliente; Actuator empieza a
+medir cuando el servidor toma la solicitud. La diferencia observada fue de
+aproximadamente 0.958 ms. En esta corrida corta local no hubo señales de
+saturación; bajo load, el defecto PERF-01 permitió atribuir la degradación a la
+creación repetida de conexiones JDBC antes de usar HikariCP.
 
 ### Próxima acción
 
-Revisar y calibrar la distribución/histograma de `http.server.requests` en un
-entorno de medición separado, y repetir una corrida corta después de validar
-que Prometheus expone límites de bucket suficientes para estimar el p95.
+Se configuraron límites mínimo de 1 µs y máximo de 1 s para
+`http.server.requests`, y se validaron los buckets y percentiles mediante una
+instancia limpia en el puerto 8081. La evidencia está en
+[`perf/results/observability-ci.md`](perf/results/observability-ci.md).
 
 ---
 
@@ -85,4 +88,4 @@ que Prometheus expone límites de bucket suficientes para estimar el p95.
 | ID | Hallazgo | Estado | Evidencia principal |
 |---|---|---|---|
 | PERF-01 | Conexiones JDBC sin reutilización | Resuelto y verificado | `summary-load-50us.json` vs. `summary-load-pool.json` |
-| OBS-01 | Percentiles de servidor sin resolución útil | Abierto | Consulta Actuator/Prometheus durante `load` |
+| OBS-01 | Resolución insuficiente de percentiles del servidor | Resuelto y verificado | `observability-ci.md` |
