@@ -192,6 +192,7 @@ Estos son los escenarios que **implementan los scripts**. Se activan con `--env 
 
 | `SCENARIO` | Modelo de carga | Forma | Duración | Para qué |
 |---|---|---|---|---|
+| `ci` | cerrado, VUs constantes | 20 VUs | 60 s | Gate corto y repetible para cada Pull Request |
 | `baseline` | cerrado, VUs constantes | 20 VUs | 5 min | Referencia estable para comparar |
 | `load` | cerrado, rampa | 0→200 VUs (2 min), sostener 10 min, bajar 2 min | 14 min | Comportamiento en carga esperada |
 | `stress` | cerrado, rampa | 200→600 VUs (5 min), sostener 3 min | 10 min | Encontrar el punto de saturación |
@@ -239,7 +240,7 @@ Variables de entorno soportadas:
 
 - `BASE_URL` (por defecto `http://localhost:8080`)
 - `DATA_FILE` (por defecto `perf/data/persons.csv`)
-- `SCENARIO`: `baseline` | `load` | `stress` | `spike` | `soak` | `regression` (por defecto `baseline`)
+- `SCENARIO`: `ci` | `baseline` | `load` | `stress` | `spike` | `soak` | `regression` (por defecto `baseline`)
 - `TIMEOUT_MS`: timeout del cliente HTTP (por defecto `2000`)
 
 > Si ya tienes el archivo desde el taller, úsalo tal cual. Si no, crea uno con el contenido proporcionado anteriormente.
@@ -410,7 +411,7 @@ Tres decisiones de ese flujo que conviene entender:
 
 Un `sleep 30` fijo en lugar de ese bucle es una fuente clásica de pruebas inestables: a veces alcanza, a veces no.
 
-**2. En un pull request solo corre el escenario corto.** El escenario `load` dura casi 15 minutos y bloquearía la revisión. Los escenarios largos van en `workflow_dispatch` o en una ejecución nocturna.
+**2. En un pull request solo corre el escenario corto `ci`.** Usa 20 VUs por 60 segundos y conserva los mismos *thresholds*. El escenario `load` dura casi 15 minutos y bloquearía la revisión; los escenarios largos van en `workflow_dispatch` o en una ejecución nocturna.
 
 **3. El gate no necesita lógica adicional.** Los `thresholds` del script ya son el criterio: si el p95 supera el SLO o la tasa de error pasa del 1%, k6 termina con código distinto de cero y el paso falla solo.
 

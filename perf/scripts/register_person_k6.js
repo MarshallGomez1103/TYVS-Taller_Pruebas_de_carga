@@ -71,6 +71,14 @@ const persons = new SharedArray('persons', function () {
  * Pueden activarse por __ENV.SCENARIO
  */
 const ALL_SCENARIOS = {
+  ci: {
+    // Gate breve para cada Pull Request. No modifica los escenarios
+    // académicos: baseline, load y stress conservan sus duraciones reales.
+    executor: 'constant-vus',
+    vus: 20,
+    duration: '60s',
+    gracefulStop: '10s',
+  },
   baseline: {
     executor: 'constant-vus',
     vus: 20,

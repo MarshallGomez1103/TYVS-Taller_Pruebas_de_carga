@@ -17,10 +17,18 @@ public class RegistryRepository implements RegistryRepositoryPort {
         this.jdbcUrl = jdbcUrl;
         this.username = username;
         this.password = password;
+        com.zaxxer.hikari.HikariConfig cfg = new com.zaxxer.hikari.HikariConfig();
+        cfg.setJdbcUrl(jdbcUrl);
+        cfg.setUsername(username);
+        cfg.setPassword(password);
+        cfg.setMaximumPoolSize(20);
+        this.ds = new com.zaxxer.hikari.HikariDataSource(cfg);
     }
 
+    private final com.zaxxer.hikari.HikariDataSource ds;
+
     private Connection getConnection() throws SQLException {
-        return DriverManager.getConnection(jdbcUrl, username, password);
+        return ds.getConnection();
     }
 
     @Override

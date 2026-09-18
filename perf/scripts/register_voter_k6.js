@@ -89,6 +89,14 @@ const voters = new SharedArray('voters', function () {
  * scripts sean comparables entre si.
  */
 const ALL_SCENARIOS = {
+  ci: {
+    // Gate breve para cada Pull Request. Los escenarios académicos no se
+    // alteran: este caso solo evita convertir cada PR en una corrida de 5 min.
+    executor: 'constant-vus',
+    vus: 20,
+    duration: '60s',
+    gracefulStop: '10s',
+  },
   baseline: {
     executor: 'constant-vus',
     vus: 20,

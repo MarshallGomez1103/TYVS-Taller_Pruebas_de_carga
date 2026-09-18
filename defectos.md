@@ -1,129 +1,88 @@
-# Registro de Defectos — EJEMPLO DEL PROFESOR
+# Registro de defectos y hallazgos de rendimiento
 
+Curso: Testing y Validación de Software
 
-> **Este archivo es un ejemplo**, no su entrega. Las cifras que aparecen abajo son ilustrativas: no provienen de una corrida real de este repositorio. Para su taller parta de [`defectos_template.md`](defectos_template.md) y documente los defectos con **sus propias mediciones**.
+Proyecto: Taller de Pruebas de Carga y Rendimiento
 
-Curso: Testing y Validación de Software\
-Proyecto: Pruebas de Carga y Rendimiento\
-Equipo: \[Nombre del equipo\]\
-Fecha: \[Fecha\]
+Fecha de las mediciones: 17 de septiembre de 2026
 
-------------------------------------------------------------------------
+Equipo: por completar por el equipo
 
-## Introducción
+Este registro usa únicamente las corridas conservadas en
+[`perf/results/`](perf/results/). Los SLO del taller son: p95 ≤ 300 ms,
+p99 ≤ 800 ms, fallos HTTP < 1 %, resultado de negocio incorrecto < 1 % y
+throughput de referencia ≥ 100 req/s.
 
-Este documento recopila los defectos identificados durante la ejecución
-de pruebas de rendimiento (Baseline, Load, Stress, Spike, Soak y
-Regresión).\
-Cada defecto se documenta para garantizar trazabilidad, análisis técnico
-y propuesta de mejora.
+---
 
-------------------------------------------------------------------------
+## PERF-01 — Creación de conexiones JDBC por operación
 
-## Formato 1: Lista detallada
+| Campo | Registro |
+|---|---|
+| Estado | **Resuelto y verificado** |
+| Prioridad | Alta (eficiencia y capacidad) |
+| Capa afectada | Persistencia / acceso a H2 |
+| Escenario que lo evidenció | `load`, rampa de 0 a 200 VUs, antes y después del cambio |
+| Resultado esperado | Reutilizar conexiones JDBC para evitar el costo repetido de crearlas y cerrarlas bajo concurrencia. |
+| Resultado antes de la corrección | p95 = 11.182 ms, p99 = 25.588 ms, 27,911.30 req/s, 0 % de fallos HTTP y 0 % de fallos de negocio. |
+| Resultado después de la corrección | p95 = 8.507 ms, p99 = 12.567 ms, 36,698.65 req/s, 0 % de fallos HTTP y 0 % de fallos de negocio. |
 
-## Defecto PERF-01 --- Incumplimiento de SLO de latencia bajo Load
+### Evidencia y diagnóstico
 
--   Capa afectada: Aplicación / Base de datos\
--   Escenario: Load Test (200 VUs)\
--   SLO definido: p95 \< 300 ms\
--   Resultado esperado: Cumplimiento del SLO bajo carga nominal.\
--   Resultado obtenido: p95 = 612 ms
+Antes del cambio, `RegistryRepository.getConnection()` invocaba
+`DriverManager.getConnection(...)` en cada operación. Una petición de registro
+puede ejecutar más de una operación de persistencia, por lo que el costo de
+crear y cerrar conexiones se repetía bajo carga.
 
-### Evidencia
+Los artefactos comparados son:
 
-http_req_duration: avg=402ms\
-p(95)=612ms\
-p(99)=890ms
+- Antes: [`summary-load-50us.json`](perf/results/summary-load-50us.json).
+- Después: [`summary-load-pool.json`](perf/results/summary-load-pool.json).
 
-### Impacto
+La corrección incorpora HikariCP 5.1.0 y un `HikariDataSource` con máximo 20
+conexiones reutilizables. Frente a la corrida anterior, el p95 disminuyó
+23.92 %, el p99 disminuyó 50.89 % y el throughput aumentó 31.48 %, sin
+introducir fallos HTTP ni de negocio.
 
-Incumplimiento del objetivo de nivel de servicio bajo carga esperada.
+### Validación de la corrección
 
-### Causa probable
+- `mvn clean verify`: exitoso; 4 pruebas de integración sin fallos.
+- `GET /actuator/health`: estado `UP`.
+- `POST /register` con una persona válida: respuesta `VALID`.
+- Corrida `load` posterior al pool: resultados conservados en
+  `summary-load-pool.json`.
 
--   Saturación del pool de conexiones.\
--   Consulta sin índice.
+---
 
-### Estado
+## OBS-01 — Percentiles de Actuator no utilizables para comparar p95 del servidor
 
-Abierto
-
-### Prioridad
-
-Alta
-
-------------------------------------------------------------------------
-
-## Defecto PERF-02 --- Error rate elevado bajo Stress
-
--   Capa afectada: Servidor de aplicación\
--   Escenario: Stress Test (600 VUs)\
--   SLO definido: Error rate \< 1%\
--   Resultado obtenido: 3.8%
-
-### Evidencia
-
-http_req_failed: 3.8%\
-status=500 detectado
+| Campo | Registro |
+|---|---|
+| Estado | Abierto — mejora de observabilidad pendiente |
+| Prioridad | Media |
+| Capa afectada | Métricas Micrometer / Prometheus |
+| Escenario observado | `load` antes del pool |
+| Resultado esperado | Obtener un p95 del servidor con resolución útil para compararlo con el p95 de k6. |
+| Resultado obtenido | En una corrida `load` sin pool, Actuator registró 23,264,332 solicitudes y un máximo de 81.77 ms; sin embargo, la exportación Prometheus mostró p50, p95 y p99 como `0.0` s y solo el bucket `+Inf`. |
 
 ### Impacto
 
-Fallas del sistema bajo carga alta.
+La latencia de k6 sí es válida como medición del cliente, pero no se debe
+afirmar que el p95 del servidor fue literalmente 0 ms. Con esta resolución no
+es posible cuantificar de forma confiable la diferencia cliente-servidor ni
+atribuirla exactamente a cola, red o procesamiento.
 
-### Causa probable
+### Próxima acción
 
--   Agotamiento de threads.\
--   Configuración insuficiente.
+Revisar y calibrar la distribución/histograma de `http.server.requests` en un
+entorno de medición separado, y repetir una corrida corta después de validar
+que Prometheus expone límites de bucket suficientes para estimar el p95.
 
-### Estado
+---
 
-En progreso
+## Resumen de seguimiento
 
-### Prioridad
-
-Crítica
-
-------------------------------------------------------------------------
-
-## Defecto PERF-03 --- Degradación progresiva en Soak Test
-
--   Capa afectada: JVM / Memoria\
--   Escenario: Soak Test (2 horas)\
--   Resultado esperado: Latencia estable\
--   Resultado obtenido: Incremento progresivo de 210ms a 480ms
-
-### Impacto
-
-Posible fuga de memoria o acumulación de recursos.
-
-### Estado
-
-Abierto
-
-### Prioridad
-
-Media
-
-------------------------------------------------------------------------
-
-## Formato 2: Tabla de seguimiento
-
-| ID | Escenario | Resultado esperado | Resultado obtenido | Estado | Prioridad |
-|----|-----------|--------------------|--------------------|--------|-----------|
-| PERF-01 | Load | p95 < 300 ms | 612 ms | Abierto | Alta |
-| PERF-02 | Stress | Error < 1% | 3.8% | En progreso | Crítica |
-| PERF-03 | Soak | Latencia estable | Degradación progresiva | Abierto | Media |
-
-------------------------------------------------------------------------
-
-## Convenciones de Estado
-
-Abierto: Defecto identificado sin corrección aplicada.\
-En progreso: En proceso de corrección.\
-Resuelto: Corregido y validado con nuevas pruebas.
-
-------------------------------------------------------------------------
-
-Universidad de La Sabana -- Facultad de Ingeniería\
-Curso: Testing y Validación de Software (2025-1)
+| ID | Hallazgo | Estado | Evidencia principal |
+|---|---|---|---|
+| PERF-01 | Conexiones JDBC sin reutilización | Resuelto y verificado | `summary-load-50us.json` vs. `summary-load-pool.json` |
+| OBS-01 | Percentiles de servidor sin resolución útil | Abierto | Consulta Actuator/Prometheus durante `load` |
