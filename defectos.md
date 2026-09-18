@@ -6,7 +6,7 @@ Proyecto: Taller de Pruebas de Carga y Rendimiento
 
 Fecha de las mediciones: 17 de septiembre de 2026
 
-Equipo: por completar por el equipo
+Equipo: Elioth Thomas Gomez Morales
 
 Este registro usa únicamente las corridas conservadas en
 [`perf/results/`](perf/results/). Los SLO del taller son: p95 ≤ 300 ms,
