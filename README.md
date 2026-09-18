@@ -60,15 +60,15 @@ Comprender, diseñar e implementar **pruebas de rendimiento** (baseline, carga, 
 .
 ├─ README.md                     # este documento
 ├─ guia-visual-pruebas-de-carga.html  # guía visual: mediciones reales y simulador de ejecución
-├─ defectos.md                   # ejemplo del profesor
-├─ defectos_template.md          # plantilla para su entrega
+├─ defectos.md                   # registro de hallazgos del equipo
+├─ defectos_template.md          # plantilla de referencia
 ├─ registraduria/                # SISTEMA BAJO PRUEBA (Spring Boot)
 │   ├─ pom.xml
 │   └─ src/main/...              # el servicio con POST /register
 └─ perf/
     ├─ scripts/                  # register_person_k6.js, register_voter_k6.js
     ├─ data/                     # persons.csv, voters.csv
-    ├─ results/                  # resúmenes de cada corrida (no se versionan)
+    ├─ results/                  # resúmenes canónicos versionados; volcados crudos ignorados
     ├─ ci/                       # plantilla de GitHub Actions
     └─ lab/                      # mediciones de la presentación (material del profesor)
 ```
